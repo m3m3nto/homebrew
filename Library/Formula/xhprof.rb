@@ -8,11 +8,13 @@ class Xhprof <Formula
   depends_on 'pcre'
 
   def install
+    extensions = lib + %x[php-config --extension-dir].split('lib/')[1].strip
+
     Dir.chdir "xhprof-#{version}/extension" do
       system "phpize"
       system "./configure", "--prefix=#{prefix}"
       system "make"
-      prefix.install %w(modules/xhprof.so)
+      extensions.install 'modules/xhprof.so'
     end
     Dir.chdir "xhprof-#{version}" do 
       prefix.install %w(xhprof_html xhprof_lib)
