@@ -8,12 +8,15 @@ class Apc < Formula
   depends_on 'pcre'
 
   def install
+    extensions = lib + %x[php-config --extension-dir].split('lib/')[1].strip
+
     Dir.chdir "APC-#{version}" do
       system "phpize"
       system "./configure", "--prefix=#{prefix}"
       system "make"
 
-      prefix.install %w(modules/apc.so apc.php)
+      prefix.install "apc.php"
+      extensions.install "modules/apc.so"
     end
   end
 
