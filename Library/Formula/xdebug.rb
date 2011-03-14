@@ -6,6 +6,9 @@ class Xdebug < Formula
   md5 '2abf000f8d94af469773b31772aa96ab'
 
   def install
+    extensions = lib + %x[php-config --extension-dir].split('lib/')[1].strip
+    ini_dir = etc + %x[php --ini].grep(/Scan/)[0].split(':')[1].split('etc/')[1].strip
+    
     Dir.chdir "xdebug-#{version}" do
       # See https://github.com/mxcl/homebrew/issues/issue/69
       ENV.universal_binary unless Hardware.is_64_bit?
@@ -15,7 +18,10 @@ class Xdebug < Formula
                             "--prefix=#{prefix}",
                             "--enable-xdebug"
       system "make"
-      prefix.install 'modules/xdebug.so'
+      extensions.install 'modules/xdebug.so'
+
+      File.open('xdebug.ini', 'w') {|f| f.write("zend_extension=#{extensions}/xdebug.so")}
+      ini_dir.install 'xdebug.ini'
     end
   end
 
