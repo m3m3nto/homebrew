@@ -4,7 +4,7 @@ def mysql_installed?
   `which mysql_config`.length > 0
 end
 
-class Php <Formula
+class Php < Formula
   url 'http://www.php.net/get/php-5.3.6.tar.gz/from/this/mirror'
   homepage 'http://php.net/'
   md5 '88a2b00047bc53afbbbdf10ebe28a57e'
@@ -12,7 +12,6 @@ class Php <Formula
 
   # So PHP extensions don't report missing symbols
   skip_clean ['bin', 'sbin']
-
 
   depends_on 'libxml2'
   depends_on 'jpeg'
@@ -34,7 +33,10 @@ class Php <Formula
   if ARGV.include? '--with-intl'
     depends_on 'icu4c'
   end
-  
+  if ARGV.include? '--with-imap'
+    depends_on 'cclient'
+  end
+
   def options
    [
      ['--with-mysql', 'Include MySQL support'],
@@ -42,20 +44,22 @@ class Php <Formula
      ['--with-mssql', 'Include MSSQL-DB support'],
      ['--with-fpm', 'Enable building of the fpm SAPI executable'],
      ['--with-apache', 'Build shared Apache 2.0 Handler module'],
-     ['--with-intl', 'Include intl extension']
+     ['--with-intl', 'Include intl extension'],
+     ['--with-imap', 'Include IMAP support.']
    ]
   end
 
   def patches
    DATA
   end
-  
+
   def configure_args
     args = [
       "--prefix=#{prefix}",
       "--disable-debug",
       "--disable-dependency-tracking",
-      "--with-config-file-path=#{prefix}/etc",
+      "--with-config-file-path=#{prefix}/etc/php5",
+      "--with-config-file-scan-dir=#{HOMEBREW_PREFIX}/etc/php5/conf.d",
       "--with-iconv-dir=/usr",
       "--enable-exif",
       "--enable-soap",
@@ -143,14 +147,20 @@ class Php <Formula
       args.push "--with-icu-dir=#{Formula.factory('icu4c').prefix}"
     end
 
+    if ARGV.include? '--with-imap'
+      args.push "--with-imap=#{Formula.factory('cclient').prefix}"
+      args.push "--with-imap-ssl=#{Formula.factory('cclient').prefix}"
+    end
+
     return args
   end
-  
+
   def install
     # Because for icu4c, we must link with c++ when building with intl extension
     ENV.append 'LDFLAGS', '-lstdc++' if ARGV.include? '--with-intl'
 
     ENV.O3 # Speed things up
+    ENV["EXTENSION_DIR"] = "/usr/local/lib/php/extensions/no-debug-non-zts-20090626"
     system "./configure", *configure_args
 
     if ARGV.include? '--with-apache'
@@ -158,12 +168,12 @@ class Php <Formula
       inreplace "Makefile",
         "INSTALL_IT = $(mkinstalldirs) '$(INSTALL_ROOT)/usr/libexec/apache2' && $(mkinstalldirs) '$(INSTALL_ROOT)/private/etc/apache2' && /usr/sbin/apxs -S LIBEXECDIR='$(INSTALL_ROOT)/usr/libexec/apache2' -S SYSCONFDIR='$(INSTALL_ROOT)/private/etc/apache2' -i -a -n php5 libs/libphp5.so",
         "INSTALL_IT = $(mkinstalldirs) '#{prefix}/libexec/apache2' && $(mkinstalldirs) '$(INSTALL_ROOT)/private/etc/apache2' && /usr/sbin/apxs -S LIBEXECDIR='#{prefix}/libexec/apache2' -S SYSCONFDIR='$(INSTALL_ROOT)/private/etc/apache2' -i -a -n php5 libs/libphp5.so"
+
     end
-    
+
     system "make"
     system "make install"
-
-    system "cp ./php.ini-production #{prefix}/etc/php.ini"
+    (prefix+'etc/php5').install "php.ini-production" => "php.ini"
 
     if ARGV.include? '--with-fpm'
       (prefix+'org.php.php-fpm.plist').write startup_plist
@@ -177,15 +187,14 @@ class Php <Formula
    For 10.5 and Apache:
     Apache needs to run in 32-bit mode. You can either force Apache to start 
     in 32-bit mode or you can thin the Apache executable.
-   
+
    To enable PHP in Apache add the following to httpd.conf and restart Apache:
     LoadModule php5_module    #{prefix}/libexec/apache2/libphp5.so
 
     The php.ini file can be found in:
-      #{prefix}/etc/php.ini
+      #{prefix}/etc/php5/php.ini
    EOS
  end
-
 
  def startup_plist; <<-EOPLIST.undent
    <?xml version="1.0" encoding="UTF-8"?>
@@ -201,6 +210,7 @@ class Php <Formula
    </dict>
    </plist>
    EOPLIST
+
  end
 end
 
